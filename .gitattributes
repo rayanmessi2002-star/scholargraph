@@ -1,0 +1,7 @@
+# Keep text files consistent across operating systems
+* text=auto eol=lf
+
+# Native Windows scripts
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
