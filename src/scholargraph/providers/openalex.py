@@ -103,7 +103,15 @@ class OpenAlexProvider:
         if self._owns_client:
             self._client.close()
 
-    def search(self, query: str, *, limit: int = 10) -> list[Publication]:
+    def search(
+        self,
+        query: str,
+        *,
+        limit: int = 10,
+        page: int = 1,
+        from_year: int | None = None,
+        to_year: int | None = None,
+    ) -> list[Publication]:
         """Search OpenAlex and return normalized publications."""
         normalized_query = query.strip()
 
@@ -113,11 +121,26 @@ class OpenAlexProvider:
         if not 1 <= limit <= 100:
             raise ValueError("Limit must be between 1 and 100")
 
+        if not 1 <= page <= 500:
+            raise ValueError("Page must be between 1 and 500")
+
+        if page * limit > 10_000:
+            raise ValueError("Page and limit cannot request results beyond the first 10,000")
+
+        year_filter = self._build_year_filter(
+            from_year=from_year,
+            to_year=to_year,
+        )
+
         params: dict[str, str | int] = {
             "search": normalized_query,
             "per_page": limit,
+            "page": page,
             "select": _OPENALEX_FIELDS,
         }
+
+        if year_filter:
+            params["filter"] = year_filter
 
         if self._api_key:
             params["api_key"] = self._api_key
@@ -138,10 +161,44 @@ class OpenAlexProvider:
         return publications
 
     @staticmethod
+    def _build_year_filter(
+        *,
+        from_year: int | None,
+        to_year: int | None,
+    ) -> str | None:
+        """Build an inclusive OpenAlex publication-year filter."""
+        for field_name, year in (
+            ("From year", from_year),
+            ("To year", to_year),
+        ):
+            if year is not None and not 1000 <= year <= 2100:
+                raise ValueError(f"{field_name} must be between 1000 and 2100")
+
+        if from_year is not None and to_year is not None and from_year > to_year:
+            raise ValueError("From year must not be greater than to year")
+
+        if from_year is not None and to_year is not None:
+            if from_year == to_year:
+                return f"publication_year:{from_year}"
+
+            return f"publication_year:{from_year}-{to_year}"
+
+        if from_year is not None:
+            return f"publication_year:>{from_year - 1}"
+
+        if to_year is not None:
+            return f"publication_year:<{to_year + 1}"
+
+        return None
+
+    @staticmethod
     def _to_publication(work: _OpenAlexWork) -> Publication:
         """Convert an OpenAlex work into a ScholarGraph publication."""
         authors = tuple(
-            Author(name=authorship.author.display_name, orcid=authorship.author.orcid)
+            Author(
+                name=authorship.author.display_name,
+                orcid=authorship.author.orcid,
+            )
             for authorship in work.authorships
             if authorship.author.display_name
         )
