@@ -2,7 +2,7 @@
 
 ScholarGraph is a command-line academic search engine designed to retrieve, organize, and eventually summarize scientific literature with verifiable citations.
 
-> **Project status:** Early development — version 0.1.0 currently provides the project foundation and a tested command-line interface.
+> **Project status:** Early development — version 0.1.0 currently provides the project foundation, a tested command-line interface, and validated publication models.
 
 ## Goals
 
@@ -20,9 +20,12 @@ ScholarGraph aims to:
 - Installable Python package.
 - Command-line interface built with Typer.
 - Version command.
+- Validated and immutable publication and author domain models.
+- DOI normalization and validation.
 - Automated tests with pytest.
 - Static type checking with mypy.
 - Linting and formatting with Ruff.
+- Continuous integration with GitHub Actions.
 
 ## Requirements
 
@@ -80,19 +83,43 @@ Apply automatic formatting:
 ruff format .
 ```
 
+Run tests with a coverage report:
+
+```cmd
+pytest --cov=scholargraph --cov-report=term-missing
+```
+
+## Continuous integration
+
+GitHub Actions automatically runs the following checks for every Pull Request targeting `main`:
+
+- Project installation.
+- Ruff linting.
+- Ruff formatting verification.
+- mypy static type checking.
+- pytest tests with coverage reporting.
+
 ## Project structure
 
 ```text
-Scholargraph/
+scholargraph/
+├── .github/
+│   └── workflows/
+│       └── ci.yml
 ├── docs/
 │   └── architecture.md
 ├── src/
 │   └── scholargraph/
+│       ├── domain/
+│       │   ├── __init__.py
+│       │   └── publication.py
 │       ├── __init__.py
 │       └── cli.py
 ├── tests/
-│   └── test_cli.py
+│   ├── test_cli.py
+│   └── test_publication.py
 ├── .env.example
+├── .gitattributes
 ├── .gitignore
 ├── pyproject.toml
 └── README.md
@@ -102,7 +129,7 @@ Scholargraph/
 
 - [x] Create the Python project foundation.
 - [x] Add a tested command-line interface.
-- [ ] Define the publication data model.
+- [x] Define the publication data model.
 - [ ] Integrate the first academic data provider.
 - [ ] Add search filters and pagination.
 - [ ] Add result ranking and deduplication.
@@ -116,4 +143,5 @@ Scholargraph/
 - The language model must never act as the source of publication metadata.
 - External services must remain replaceable.
 - Core functionality must be testable without real network requests.
+- Domain models must remain independent from provider-specific responses.
 - Secrets must never be committed to Git.
