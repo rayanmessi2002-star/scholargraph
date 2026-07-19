@@ -2,7 +2,7 @@
 
 ScholarGraph is a command-line academic search engine designed to retrieve, normalize, organize, and eventually summarize scientific literature with verifiable citations.
 
-> **Project status:** Early development — version 0.1.0 provides validated publication models and an OpenAlex-powered academic search command.
+> **Project status:** Early development — version 0.1.0 provides validated publication models and an OpenAlex-powered academic search command with filtering and pagination.
 
 ## Goals
 
@@ -20,7 +20,10 @@ ScholarGraph aims to:
 - Installable Python package.
 - Command-line interface built with Typer.
 - Version command.
-- Academic search command with configurable result limits.
+- Academic search command.
+- Configurable results per page.
+- Page-based result navigation.
+- Inclusive publication-year filters.
 - Validated and immutable publication and author domain models.
 - DOI normalization and validation.
 - OpenAlex keyword-search provider.
@@ -72,23 +75,51 @@ Search OpenAlex for academic publications:
 scholargraph search "graph databases"
 ```
 
-Limit the number of results:
+Limit the number of results per page:
 
 ```cmd
 scholargraph search "machine learning" --limit 3
 ```
 
+Filter publications by an inclusive year range:
+
+```cmd
+scholargraph search "machine learning" --from-year 2020 --to-year 2024
+```
+
+Retrieve a specific results page:
+
+```cmd
+scholargraph search "machine learning" --page 2
+```
+
+Combine pagination, limits, and publication-year filters:
+
+```cmd
+scholargraph search "machine learning" --limit 3 --page 2 --from-year 2020 --to-year 2024
+```
+
+Basic page-based navigation is limited to the first 10,000 matching OpenAlex results.
+
 The optional `OPENALEX_API_KEY` environment variable can be used to authenticate requests without exposing credentials in command history.
 
 ## OpenAlex provider
 
-The OpenAlex provider can also be used directly from Python:
+ScholarGraph retrieves academic metadata from the [OpenAlex API](https://developers.openalex.org/).
+
+The provider can also be used directly from Python:
 
 ```python
 from scholargraph.providers import OpenAlexProvider
 
 with OpenAlexProvider() as provider:
-    publications = provider.search("graph databases", limit=5)
+    publications = provider.search(
+        "graph databases",
+        limit=5,
+        page=1,
+        from_year=2020,
+        to_year=2026,
+    )
 
 for publication in publications:
     print(publication.title)
@@ -184,7 +215,7 @@ scholargraph/
 - [x] Define the publication data model.
 - [x] Integrate the first academic data provider.
 - [x] Expose academic search through the CLI.
-- [ ] Add search filters and pagination.
+- [x] Add search filters and pagination.
 - [ ] Add result ranking and deduplication.
 - [ ] Add citation-preserving summaries.
 - [ ] Add Markdown, JSON, and BibTeX exports.

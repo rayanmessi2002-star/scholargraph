@@ -47,6 +47,8 @@ def test_search_maps_openalex_response() -> None:
         assert request.url.path == "/works"
         assert request.url.params["search"] == "machine learning"
         assert request.url.params["per_page"] == "2"
+        assert request.url.params["page"] == "2"
+        assert request.url.params["filter"] == ("publication_year:2020-2026")
         assert request.url.params["api_key"] == "test-key"
         assert "abstract_inverted_index" in request.url.params["select"]
 
@@ -62,7 +64,13 @@ def test_search_maps_openalex_response() -> None:
         base_url=OPENALEX_BASE_URL,
     ) as client:
         provider = OpenAlexProvider(api_key="test-key", client=client)
-        publications = provider.search("  machine learning  ", limit=2)
+        publications = provider.search(
+            "  machine learning  ",
+            limit=2,
+            page=2,
+            from_year=2020,
+            to_year=2026,
+        )
 
     assert len(publications) == 1
 
@@ -77,6 +85,45 @@ def test_search_maps_openalex_response() -> None:
     assert publication.journal == "Journal of Examples"
     assert publication.doi == "10.1000/example"
     assert str(publication.url) == "https://example.org/publication"
+
+
+@pytest.mark.parametrize(
+    ("from_year", "to_year", "expected_filter"),
+    [
+        (2020, None, "publication_year:>2019"),
+        (None, 2026, "publication_year:<2027"),
+        (2026, 2026, "publication_year:2026"),
+    ],
+)
+def test_search_builds_supported_year_filters(
+    from_year: int | None,
+    to_year: int | None,
+    expected_filter: str,
+) -> None:
+    """One-sided and exact-year filters should use OpenAlex syntax."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.params["filter"] == expected_filter
+
+        return httpx.Response(
+            status_code=200,
+            json={"results": []},
+        )
+
+    transport = httpx.MockTransport(handler)
+
+    with httpx.Client(
+        transport=transport,
+        base_url=OPENALEX_BASE_URL,
+    ) as client:
+        provider = OpenAlexProvider(client=client)
+        publications = provider.search(
+            "graph databases",
+            from_year=from_year,
+            to_year=to_year,
+        )
+
+    assert publications == []
 
 
 @pytest.mark.parametrize("query", ["", "   ", "\t"])
@@ -97,6 +144,55 @@ def test_search_rejects_invalid_limit(limit: int) -> None:
 
         with pytest.raises(ValueError, match="between 1 and 100"):
             provider.search("machine learning", limit=limit)
+
+
+@pytest.mark.parametrize("page", [0, 501])
+def test_search_rejects_invalid_page(page: int) -> None:
+    """OpenAlex basic page numbers should remain in the supported range."""
+    with httpx.Client(base_url=OPENALEX_BASE_URL) as client:
+        provider = OpenAlexProvider(client=client)
+
+        with pytest.raises(ValueError, match="between 1 and 500"):
+            provider.search("machine learning", page=page)
+
+
+def test_search_rejects_results_beyond_basic_paging_limit() -> None:
+    """Basic pagination should not request results beyond 10,000."""
+    with httpx.Client(base_url=OPENALEX_BASE_URL) as client:
+        provider = OpenAlexProvider(client=client)
+
+        with pytest.raises(ValueError, match="first 10,000"):
+            provider.search(
+                "machine learning",
+                limit=100,
+                page=101,
+            )
+
+
+@pytest.mark.parametrize(
+    ("from_year", "to_year"),
+    [
+        (999, None),
+        (2101, None),
+        (None, 999),
+        (None, 2101),
+        (2026, 2020),
+    ],
+)
+def test_search_rejects_invalid_year_filters(
+    from_year: int | None,
+    to_year: int | None,
+) -> None:
+    """Invalid publication-year ranges should be rejected."""
+    with httpx.Client(base_url=OPENALEX_BASE_URL) as client:
+        provider = OpenAlexProvider(client=client)
+
+        with pytest.raises(ValueError):
+            provider.search(
+                "machine learning",
+                from_year=from_year,
+                to_year=to_year,
+            )
 
 
 def test_search_wraps_openalex_http_errors() -> None:

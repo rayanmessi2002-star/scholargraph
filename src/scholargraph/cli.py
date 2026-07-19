@@ -48,35 +48,96 @@ def search(
             "-n",
             min=1,
             max=100,
-            help="Maximum number of publications to retrieve.",
+            help="Number of publications to retrieve per page.",
         ),
     ] = 5,
+    page: Annotated[
+        int,
+        typer.Option(
+            "--page",
+            "-p",
+            min=1,
+            max=500,
+            help="Results page to retrieve.",
+        ),
+    ] = 1,
+    from_year: Annotated[
+        int | None,
+        typer.Option(
+            "--from-year",
+            min=1000,
+            max=2100,
+            help="Include publications from this year onwards.",
+        ),
+    ] = None,
+    to_year: Annotated[
+        int | None,
+        typer.Option(
+            "--to-year",
+            min=1000,
+            max=2100,
+            help="Include publications up to this year.",
+        ),
+    ] = None,
 ) -> None:
     """Search OpenAlex for academic publications."""
     api_key = os.getenv("OPENALEX_API_KEY")
 
     try:
+        _validate_search_options(
+            limit=limit,
+            page=page,
+            from_year=from_year,
+            to_year=to_year,
+        )
+
         with OpenAlexProvider(api_key=api_key) as provider:
-            publications = provider.search(query, limit=limit)
+            publications = provider.search(
+                query,
+                limit=limit,
+                page=page,
+                from_year=from_year,
+                to_year=to_year,
+            )
     except (OpenAlexProviderError, ValueError) as error:
         error_console.print(f"[bold red]Search failed:[/bold red] {error}")
         raise typer.Exit(code=1) from error
 
     if not publications:
-        console.print("[yellow]No publications found.[/yellow]")
+        console.print(f"[yellow]No publications found on page {page}.[/yellow]")
         return
 
-    _print_publications(publications, query=query)
+    _print_publications(
+        publications,
+        query=query,
+        page=page,
+    )
+
+
+def _validate_search_options(
+    *,
+    limit: int,
+    page: int,
+    from_year: int | None,
+    to_year: int | None,
+) -> None:
+    """Validate option combinations that depend on each other."""
+    if page * limit > 10_000:
+        raise ValueError("Page and limit cannot request results beyond the first 10,000")
+
+    if from_year is not None and to_year is not None and from_year > to_year:
+        raise ValueError("From year must not be greater than to year")
 
 
 def _print_publications(
     publications: list[Publication],
     *,
     query: str,
+    page: int,
 ) -> None:
     """Display normalized publications in a readable table."""
     table = Table(
-        title=f"OpenAlex results: {query.strip()}",
+        title=f"OpenAlex results: {query.strip()} — page {page}",
         show_lines=True,
     )
 
@@ -107,7 +168,8 @@ def _print_publications(
 
     result_count = len(publications)
     result_label = "publication" if result_count == 1 else "publications"
-    console.print(f"[dim]{result_count} {result_label} found.[/dim]")
+
+    console.print(f"[dim]Page {page} · {result_count} {result_label} found.[/dim]")
 
 
 if __name__ == "__main__":

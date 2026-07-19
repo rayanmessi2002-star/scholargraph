@@ -23,6 +23,9 @@ class _FakeOpenAlexProvider:
     last_api_key: ClassVar[str | None] = None
     last_query: ClassVar[str | None] = None
     last_limit: ClassVar[int | None] = None
+    last_page: ClassVar[int | None] = None
+    last_from_year: ClassVar[int | None] = None
+    last_to_year: ClassVar[int | None] = None
     closed: ClassVar[bool] = False
 
     def __init__(self, api_key: str | None = None) -> None:
@@ -44,9 +47,15 @@ class _FakeOpenAlexProvider:
         query: str,
         *,
         limit: int = 10,
+        page: int = 1,
+        from_year: int | None = None,
+        to_year: int | None = None,
     ) -> list[Publication]:
         type(self).last_query = query
         type(self).last_limit = limit
+        type(self).last_page = page
+        type(self).last_from_year = from_year
+        type(self).last_to_year = to_year
 
         if self.error:
             raise self.error
@@ -64,6 +73,9 @@ def fake_openalex_provider(
     _FakeOpenAlexProvider.last_api_key = None
     _FakeOpenAlexProvider.last_query = None
     _FakeOpenAlexProvider.last_limit = None
+    _FakeOpenAlexProvider.last_page = None
+    _FakeOpenAlexProvider.last_from_year = None
+    _FakeOpenAlexProvider.last_to_year = None
     _FakeOpenAlexProvider.closed = False
 
     monkeypatch.setattr(
@@ -85,7 +97,7 @@ def test_version_command() -> None:
 def test_search_command_displays_publications(
     fake_openalex_provider: type[_FakeOpenAlexProvider],
 ) -> None:
-    """Search should display normalized OpenAlex results."""
+    """Search should display normalized and filtered OpenAlex results."""
     fake_openalex_provider.publications = [
         Publication(
             source="openalex",
@@ -100,7 +112,18 @@ def test_search_command_displays_publications(
 
     result = runner.invoke(
         app,
-        ["search", "graph databases", "--limit", "1"],
+        [
+            "search",
+            "graph databases",
+            "--limit",
+            "1",
+            "--page",
+            "2",
+            "--from-year",
+            "2020",
+            "--to-year",
+            "2025",
+        ],
         env={"OPENALEX_API_KEY": "test-key"},
     )
 
@@ -108,9 +131,13 @@ def test_search_command_displays_publications(
     assert "Graph Databases" in result.output
     assert "Ada Lovelace" in result.output
     assert "2025" in result.output
+    assert "Page 2" in result.output
     assert "1 publication found." in result.output
     assert fake_openalex_provider.last_query == "graph databases"
     assert fake_openalex_provider.last_limit == 1
+    assert fake_openalex_provider.last_page == 2
+    assert fake_openalex_provider.last_from_year == 2020
+    assert fake_openalex_provider.last_to_year == 2025
     assert fake_openalex_provider.last_api_key == "test-key"
     assert fake_openalex_provider.closed is True
 
@@ -118,11 +145,14 @@ def test_search_command_displays_publications(
 def test_search_command_handles_empty_results(
     fake_openalex_provider: type[_FakeOpenAlexProvider],
 ) -> None:
-    """Search should explain when OpenAlex returns no publications."""
-    result = runner.invoke(app, ["search", "unknown topic"])
+    """Search should explain when a page contains no publications."""
+    result = runner.invoke(
+        app,
+        ["search", "unknown topic", "--page", "3"],
+    )
 
     assert result.exit_code == 0
-    assert "No publications found." in result.output
+    assert "No publications found on page 3." in result.output
     assert fake_openalex_provider.closed is True
 
 
@@ -150,4 +180,59 @@ def test_search_command_rejects_invalid_limit(
     )
 
     assert result.exit_code == 2
+    assert fake_openalex_provider.last_query is None
+
+
+def test_search_command_rejects_invalid_page(
+    fake_openalex_provider: type[_FakeOpenAlexProvider],
+) -> None:
+    """Typer should reject page numbers outside the supported range."""
+    result = runner.invoke(
+        app,
+        ["search", "graph databases", "--page", "0"],
+    )
+
+    assert result.exit_code == 2
+    assert fake_openalex_provider.last_query is None
+
+
+def test_search_command_rejects_invalid_year_range(
+    fake_openalex_provider: type[_FakeOpenAlexProvider],
+) -> None:
+    """The first publication year must not exceed the final year."""
+    result = runner.invoke(
+        app,
+        [
+            "search",
+            "graph databases",
+            "--from-year",
+            "2026",
+            "--to-year",
+            "2020",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "From year must not be greater than to year" in result.output
+    assert fake_openalex_provider.last_query is None
+
+
+def test_search_command_rejects_deep_basic_paging(
+    fake_openalex_provider: type[_FakeOpenAlexProvider],
+) -> None:
+    """Basic paging should not exceed OpenAlex's 10,000-result limit."""
+    result = runner.invoke(
+        app,
+        [
+            "search",
+            "graph databases",
+            "--limit",
+            "100",
+            "--page",
+            "101",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "first 10,000" in result.output
     assert fake_openalex_provider.last_query is None
