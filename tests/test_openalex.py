@@ -1,0 +1,120 @@
+"""Tests for the OpenAlex academic data provider."""
+
+import httpx
+import pytest
+
+from scholargraph.providers import (
+    OPENALEX_BASE_URL,
+    OpenAlexProvider,
+    OpenAlexProviderError,
+)
+
+
+def _sample_openalex_work() -> dict[str, object]:
+    """Return a representative OpenAlex work response."""
+    return {
+        "id": "https://openalex.org/W123456",
+        "title": "Machine Learning for Scientific Discovery",
+        "authorships": [
+            {
+                "author": {
+                    "display_name": "Ada Lovelace",
+                    "orcid": "https://orcid.org/0000-0000-0000-0001",
+                }
+            }
+        ],
+        "abstract_inverted_index": {
+            "Machine": [0],
+            "learning": [1],
+            "works": [2],
+        },
+        "publication_year": 2026,
+        "primary_location": {
+            "landing_page_url": "https://example.org/publication",
+            "source": {
+                "display_name": "Journal of Examples",
+            },
+        },
+        "doi": "https://doi.org/10.1000/EXAMPLE",
+    }
+
+
+def test_search_maps_openalex_response() -> None:
+    """Search results should be converted into Publication models."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "GET"
+        assert request.url.path == "/works"
+        assert request.url.params["search"] == "machine learning"
+        assert request.url.params["per_page"] == "2"
+        assert request.url.params["api_key"] == "test-key"
+        assert "abstract_inverted_index" in request.url.params["select"]
+
+        return httpx.Response(
+            status_code=200,
+            json={"results": [_sample_openalex_work()]},
+        )
+
+    transport = httpx.MockTransport(handler)
+
+    with httpx.Client(
+        transport=transport,
+        base_url=OPENALEX_BASE_URL,
+    ) as client:
+        provider = OpenAlexProvider(api_key="test-key", client=client)
+        publications = provider.search("  machine learning  ", limit=2)
+
+    assert len(publications) == 1
+
+    publication = publications[0]
+
+    assert publication.source == "openalex"
+    assert publication.source_id == "W123456"
+    assert publication.title == "Machine Learning for Scientific Discovery"
+    assert publication.authors[0].name == "Ada Lovelace"
+    assert publication.abstract == "Machine learning works"
+    assert publication.publication_year == 2026
+    assert publication.journal == "Journal of Examples"
+    assert publication.doi == "10.1000/example"
+    assert str(publication.url) == "https://example.org/publication"
+
+
+@pytest.mark.parametrize("query", ["", "   ", "\t"])
+def test_search_rejects_blank_query(query: str) -> None:
+    """Blank search queries should be rejected before an HTTP request."""
+    with httpx.Client(base_url=OPENALEX_BASE_URL) as client:
+        provider = OpenAlexProvider(client=client)
+
+        with pytest.raises(ValueError, match="must not be blank"):
+            provider.search(query)
+
+
+@pytest.mark.parametrize("limit", [0, 101])
+def test_search_rejects_invalid_limit(limit: int) -> None:
+    """OpenAlex accepts between 1 and 100 results per page."""
+    with httpx.Client(base_url=OPENALEX_BASE_URL) as client:
+        provider = OpenAlexProvider(client=client)
+
+        with pytest.raises(ValueError, match="between 1 and 100"):
+            provider.search("machine learning", limit=limit)
+
+
+def test_search_wraps_openalex_http_errors() -> None:
+    """HTTP failures should be exposed as provider-specific errors."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            status_code=503,
+            json={"error": "Service unavailable"},
+        )
+
+    transport = httpx.MockTransport(handler)
+
+    with httpx.Client(
+        transport=transport,
+        base_url=OPENALEX_BASE_URL,
+    ) as client:
+        provider = OpenAlexProvider(client=client)
+
+        with pytest.raises(OpenAlexProviderError, match="OpenAlex search failed"):
+            provider.search("machine learning")

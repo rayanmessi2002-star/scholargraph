@@ -1,8 +1,8 @@
 # ScholarGraph
 
-ScholarGraph is a command-line academic search engine designed to retrieve, organize, and eventually summarize scientific literature with verifiable citations.
+ScholarGraph is a command-line academic search engine designed to retrieve, normalize, organize, and eventually summarize scientific literature with verifiable citations.
 
-> **Project status:** Early development — version 0.1.0 currently provides the project foundation, a tested command-line interface, and validated publication models.
+> **Project status:** Early development — version 0.1.0 provides a tested command-line foundation, validated publication models, and an OpenAlex search provider.
 
 ## Goals
 
@@ -22,7 +22,11 @@ ScholarGraph aims to:
 - Version command.
 - Validated and immutable publication and author domain models.
 - DOI normalization and validation.
-- Automated tests with pytest.
+- OpenAlex keyword-search provider.
+- OpenAlex response normalization into internal publication models.
+- OpenAlex abstract reconstruction.
+- Provider-specific HTTP and response validation errors.
+- Automated tests without real network requests.
 - Static type checking with mypy.
 - Linting and formatting with Ruff.
 - Continuous integration with GitHub Actions.
@@ -47,7 +51,7 @@ Install the project and development dependencies:
 python -m pip install -e ".[dev]"
 ```
 
-## Usage
+## Command-line usage
 
 Display the installed version:
 
@@ -61,6 +65,35 @@ Display the available commands:
 scholargraph --help
 ```
 
+## OpenAlex provider
+
+The OpenAlex provider can currently be used from Python:
+
+```python
+from scholargraph.providers import OpenAlexProvider
+
+with OpenAlexProvider() as provider:
+    publications = provider.search("graph databases", limit=5)
+
+for publication in publications:
+    print(publication.title)
+```
+
+An optional OpenAlex API key can be supplied without storing it in the source code:
+
+```python
+import os
+
+from scholargraph.providers import OpenAlexProvider
+
+with OpenAlexProvider(
+    api_key=os.getenv("OPENALEX_API_KEY"),
+) as provider:
+    publications = provider.search("machine learning", limit=5)
+```
+
+Secrets and real API keys must never be committed to the repository.
+
 ## Quality checks
 
 Run the automated tests:
@@ -69,7 +102,7 @@ Run the automated tests:
 pytest
 ```
 
-Check the code:
+Check formatting, code quality, and types:
 
 ```cmd
 ruff check .
@@ -91,7 +124,7 @@ pytest --cov=scholargraph --cov-report=term-missing
 
 ## Continuous integration
 
-GitHub Actions automatically runs the following checks for every Pull Request targeting `main`:
+GitHub Actions automatically runs the following checks for every pull request targeting `main`:
 
 - Project installation.
 - Ruff linting.
@@ -113,10 +146,14 @@ scholargraph/
 │       ├── domain/
 │       │   ├── __init__.py
 │       │   └── publication.py
+│       ├── providers/
+│       │   ├── __init__.py
+│       │   └── openalex.py
 │       ├── __init__.py
 │       └── cli.py
 ├── tests/
 │   ├── test_cli.py
+│   ├── test_openalex.py
 │   └── test_publication.py
 ├── .env.example
 ├── .gitattributes
@@ -130,7 +167,8 @@ scholargraph/
 - [x] Create the Python project foundation.
 - [x] Add a tested command-line interface.
 - [x] Define the publication data model.
-- [ ] Integrate the first academic data provider.
+- [x] Integrate the first academic data provider.
+- [ ] Expose academic search through the CLI.
 - [ ] Add search filters and pagination.
 - [ ] Add result ranking and deduplication.
 - [ ] Add citation-preserving summaries.
