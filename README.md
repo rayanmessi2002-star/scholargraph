@@ -2,7 +2,7 @@
 
 ScholarGraph is a command-line academic search engine designed to retrieve, normalize, organize, and eventually summarize scientific literature with verifiable citations.
 
-> **Project status:** Early development — version 0.1.0 provides a tested command-line foundation, validated publication models, and an OpenAlex search provider.
+> **Project status:** Early development — version 0.1.0 provides validated publication models and an OpenAlex-powered academic search command.
 
 ## Goals
 
@@ -20,6 +20,7 @@ ScholarGraph aims to:
 - Installable Python package.
 - Command-line interface built with Typer.
 - Version command.
+- Academic search command with configurable result limits.
 - Validated and immutable publication and author domain models.
 - DOI normalization and validation.
 - OpenAlex keyword-search provider.
@@ -65,9 +66,23 @@ Display the available commands:
 scholargraph --help
 ```
 
+Search OpenAlex for academic publications:
+
+```cmd
+scholargraph search "graph databases"
+```
+
+Limit the number of results:
+
+```cmd
+scholargraph search "machine learning" --limit 3
+```
+
+The optional `OPENALEX_API_KEY` environment variable can be used to authenticate requests without exposing credentials in command history.
+
 ## OpenAlex provider
 
-The OpenAlex provider can currently be used from Python:
+The OpenAlex provider can also be used directly from Python:
 
 ```python
 from scholargraph.providers import OpenAlexProvider
@@ -168,7 +183,7 @@ scholargraph/
 - [x] Add a tested command-line interface.
 - [x] Define the publication data model.
 - [x] Integrate the first academic data provider.
-- [ ] Expose academic search through the CLI.
+- [x] Expose academic search through the CLI.
 - [ ] Add search filters and pagination.
 - [ ] Add result ranking and deduplication.
 - [ ] Add citation-preserving summaries.
