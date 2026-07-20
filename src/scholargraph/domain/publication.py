@@ -26,6 +26,7 @@ class Publication(BaseModel):
     journal: str | None = None
     doi: str | None = None
     url: HttpUrl | None = None
+    cited_by_count: int = Field(default=0, ge=0)
 
     @field_validator("doi", mode="before")
     @classmethod
