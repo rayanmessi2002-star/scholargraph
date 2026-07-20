@@ -18,7 +18,7 @@ This modular design allows external APIs, ranking strategies, exporters, or lang
 | Deduplicator | Remove repeated publications safely | Implemented |
 | Ranker | Order results using transparent criteria | Implemented |
 | Synthesizer | Produce source-grounded summaries | Planned |
-| Exporter | Save results as Markdown, JSON, or BibTeX | Planned |
+| Exporter | Serialize results as JSON, CSV, Markdown, or BibTeX | Implemented |
 | API and web interface | Expose ScholarGraph beyond the CLI | Planned |
 
 ## Current data flow
@@ -29,9 +29,10 @@ This modular design allows external APIs, ranking strategies, exporters, or lang
 4. Provider-specific responses are converted into domain models.
 5. The search service removes duplicate publications.
 6. The search service ranks the remaining publications.
-7. The CLI displays the processed results in a table.
+7. The CLI displays the processed results in a table or delegates to an exporter.
+8. An exporter prints portable output or writes a UTF-8 file.
 
-Future phases will optionally synthesize and export the processed results.
+Future phases will optionally synthesize the processed results before display or export.
 
 ## Search service
 
@@ -74,6 +75,20 @@ Python's stable sorting preserves provider order when all ranking criteria are e
 
 Ranking currently applies only to publications returned on the selected page.
 
+## Export system
+
+Exporters depend only on normalized publication domain models. They do not perform searches, network requests, ranking, or deduplication.
+
+The CLI supports five output modes:
+
+1. A Rich terminal table for interactive use.
+2. JSON with structured author metadata.
+3. CSV with stable columns for data-processing tools.
+4. Markdown tables for reports and documentation.
+5. BibTeX entries with deterministic, collision-safe citation keys.
+
+Portable formats can be printed to standard output or written as UTF-8 files. File output preserves international author names and keeps serialization independent from the terminal presentation layer.
+
 ## Dependency rules
 
 - The CLI handles user interaction but does not perform HTTP requests.
@@ -81,6 +96,8 @@ Ranking currently applies only to publications returned on the selected page.
 - Domain models do not depend on external APIs.
 - Provider implementations depend on domain models.
 - The search service depends on a provider protocol rather than OpenAlex.
+- Exporters depend on domain models rather than provider responses.
+- The CLI selects output destinations, while exporters own serialization.
 - Network calls are replaced with test doubles during automated testing.
 - API keys and credentials are loaded from environment variables.
 - Ranking must remain transparent and independently testable.
@@ -94,5 +111,5 @@ Ranking currently applies only to publications returned on the selected page.
 - [x] Filtering and pagination.
 - [x] Ranking and deduplication.
 - [ ] Citation-preserving synthesis.
-- [ ] Export system.
+- [x] Export system.
 - [ ] REST API and web interface.
