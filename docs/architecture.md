@@ -14,7 +14,7 @@ This modular design allows external APIs, ranking strategies, exporters, or lang
 | Search service | Coordinate retrieval, deduplication, and ranking | Implemented |
 | Provider interface | Define the academic-provider contract | Implemented |
 | OpenAlex provider | Retrieve and normalize OpenAlex publications | Implemented |
-| Domain models | Represent publications and authors consistently | Implemented |
+| Domain models | Represent publications, authors, citations, claims, and summaries consistently | Implemented |
 | Deduplicator | Remove repeated publications safely | Implemented |
 | Ranker | Order results using transparent criteria | Implemented |
 | Synthesizer | Produce source-grounded summaries | Planned |
@@ -75,6 +75,18 @@ Python's stable sorting preserves provider order when all ranking criteria are e
 
 Ranking currently applies only to publications returned on the selected page.
 
+## Citation safety contract
+
+Synthesis output uses structured domain models before it reaches the CLI or an exporter.
+
+- Each `Citation` wraps a normalized publication and receives a deterministic label such as `S1`.
+- Each `SummaryClaim` contains text plus one or more supporting citation labels.
+- A `CitationSummary` rejects duplicate, missing, unordered, unknown, or unused citations.
+- Citation labels remain contiguous so rendered summaries are predictable and independently verifiable.
+- Validated summary models are immutable after creation.
+
+This contract will be shared by deterministic and language-model-based synthesizers. A model may propose claims, but it cannot create or reference a source that was not retrieved and normalized first.
+
 ## Export system
 
 Exporters depend only on normalized publication domain models. They do not perform searches, network requests, ranking, or deduplication.
@@ -94,6 +106,7 @@ Portable formats can be printed to standard output or written as UTF-8 files. Fi
 - The CLI handles user interaction but does not perform HTTP requests.
 - The search service coordinates application logic.
 - Domain models do not depend on external APIs.
+- Summary models enforce referential integrity between claims and publications.
 - Provider implementations depend on domain models.
 - The search service depends on a provider protocol rather than OpenAlex.
 - Exporters depend on domain models rather than provider responses.
@@ -110,6 +123,7 @@ Portable formats can be printed to standard output or written as UTF-8 files. Fi
 - [x] Academic provider integration.
 - [x] Filtering and pagination.
 - [x] Ranking and deduplication.
+- [x] Citation and summary domain models.
 - [ ] Citation-preserving synthesis.
 - [x] Export system.
 - [ ] REST API and web interface.
