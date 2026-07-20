@@ -13,7 +13,8 @@ from scholargraph.domain import Author, Publication
 OPENALEX_BASE_URL = "https://api.openalex.org"
 
 _OPENALEX_FIELDS = (
-    "id,title,authorships,abstract_inverted_index,publication_year,primary_location,doi"
+    "id,title,authorships,abstract_inverted_index,"
+    "publication_year,primary_location,doi,cited_by_count"
 )
 
 
@@ -57,6 +58,7 @@ class _OpenAlexWork(BaseModel):
     publication_year: int | None = None
     primary_location: _OpenAlexLocation | None = None
     doi: str | None = None
+    cited_by_count: int = Field(default=0, ge=0)
 
 
 class _OpenAlexResponse(BaseModel):
@@ -224,6 +226,7 @@ class OpenAlexProvider:
             journal=journal,
             doi=work.doi,
             url=url,
+            cited_by_count=work.cited_by_count,
         )
 
     @staticmethod

@@ -36,6 +36,7 @@ def _sample_openalex_work() -> dict[str, object]:
             },
         },
         "doi": "https://doi.org/10.1000/EXAMPLE",
+        "cited_by_count": 42,
     }
 
 
@@ -51,6 +52,7 @@ def test_search_maps_openalex_response() -> None:
         assert request.url.params["filter"] == ("publication_year:2020-2026")
         assert request.url.params["api_key"] == "test-key"
         assert "abstract_inverted_index" in request.url.params["select"]
+        assert "cited_by_count" in request.url.params["select"]
 
         return httpx.Response(
             status_code=200,
@@ -85,6 +87,7 @@ def test_search_maps_openalex_response() -> None:
     assert publication.journal == "Journal of Examples"
     assert publication.doi == "10.1000/example"
     assert str(publication.url) == "https://example.org/publication"
+    assert publication.cited_by_count == 42
 
 
 @pytest.mark.parametrize(
@@ -202,6 +205,30 @@ def test_search_wraps_openalex_http_errors() -> None:
         return httpx.Response(
             status_code=503,
             json={"error": "Service unavailable"},
+        )
+
+    transport = httpx.MockTransport(handler)
+
+    with httpx.Client(
+        transport=transport,
+        base_url=OPENALEX_BASE_URL,
+    ) as client:
+        provider = OpenAlexProvider(client=client)
+
+        with pytest.raises(OpenAlexProviderError, match="OpenAlex search failed"):
+            provider.search("machine learning")
+
+
+def test_search_wraps_invalid_citation_metadata() -> None:
+    """Invalid citation counts should be exposed as provider errors."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        work = _sample_openalex_work()
+        work["cited_by_count"] = -1
+
+        return httpx.Response(
+            status_code=200,
+            json={"results": [work]},
         )
 
     transport = httpx.MockTransport(handler)

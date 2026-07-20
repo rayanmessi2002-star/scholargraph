@@ -107,6 +107,7 @@ def test_search_command_displays_publications(
             publication_year=2025,
             journal="Data Journal",
             doi="10.1000/example",
+            cited_by_count=42,
         )
     ]
 
@@ -128,9 +129,12 @@ def test_search_command_displays_publications(
     )
 
     assert result.exit_code == 0, result.output
-    assert "Graph Databases" in result.output
-    assert "Ada Lovelace" in result.output
+    assert "Graph" in result.output
+    assert "Databases" in result.output
+    assert "Ada" in result.output
+    assert "Lovelace" in result.output
     assert "2025" in result.output
+    assert "42" in result.output
     assert "Page 2" in result.output
     assert "1 publication found." in result.output
     assert fake_openalex_provider.last_query == "graph databases"
@@ -140,6 +144,46 @@ def test_search_command_displays_publications(
     assert fake_openalex_provider.last_to_year == 2025
     assert fake_openalex_provider.last_api_key == "test-key"
     assert fake_openalex_provider.closed is True
+
+
+def test_search_command_uses_processed_service_results(
+    fake_openalex_provider: type[_FakeOpenAlexProvider],
+) -> None:
+    """The CLI should display deduplicated and ranked service results."""
+    fake_openalex_provider.publications = [
+        Publication(
+            source="openalex",
+            source_id="W1",
+            title="Relational Theory",
+            publication_year=2025,
+            cited_by_count=1_000,
+        ),
+        Publication(
+            source="openalex",
+            source_id="W2",
+            title="Graph Systems",
+            publication_year=2024,
+        ),
+        Publication(
+            source="openalex",
+            source_id="W3",
+            title="Graph Systems",
+            publication_year=2024,
+            journal="Data Journal",
+            cited_by_count=10,
+        ),
+    ]
+
+    result = runner.invoke(
+        app,
+        ["search", "graph systems"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert result.output.count("Graph Systems") == 1
+    assert "Relational" in result.output
+    assert "Theory" in result.output
+    assert "2 publications found." in result.output
 
 
 def test_search_command_handles_empty_results(

@@ -2,46 +2,97 @@
 
 ## Purpose
 
-ScholarGraph separates academic data retrieval, normalization, ranking, synthesis, and export into independent components.
+ScholarGraph separates academic data retrieval, normalization, deduplication, ranking, synthesis, and export into independent components.
 
-This modular design allows external APIs or language-model providers to be replaced without rewriting the complete application.
+This modular design allows external APIs, ranking strategies, exporters, or language-model providers to be replaced without rewriting the complete application.
 
-## Planned components
+## Components
 
-| Component | Responsibility |
-|---|---|
-| CLI | Receive commands and display results |
-| Search service | Coordinate the complete search workflow |
-| Provider | Retrieve publications from an external academic API |
-| Domain models | Represent publications consistently |
-| Ranker | Order results according to relevance |
-| Synthesizer | Produce source-grounded summaries |
-| Exporter | Save results as Markdown, JSON, or BibTeX |
+| Component | Responsibility | Status |
+|---|---|---|
+| CLI | Receive commands, validate options, and display results | Implemented |
+| Search service | Coordinate retrieval, deduplication, and ranking | Implemented |
+| Provider interface | Define the academic-provider contract | Implemented |
+| OpenAlex provider | Retrieve and normalize OpenAlex publications | Implemented |
+| Domain models | Represent publications and authors consistently | Implemented |
+| Deduplicator | Remove repeated publications safely | Implemented |
+| Ranker | Order results using transparent criteria | Implemented |
+| Synthesizer | Produce source-grounded summaries | Planned |
+| Exporter | Save results as Markdown, JSON, or BibTeX | Planned |
+| API and web interface | Expose ScholarGraph beyond the CLI | Planned |
 
-## Planned data flow
+## Current data flow
 
-1. The user submits a search query.
-2. The provider retrieves publications.
-3. Results are converted into internal domain models.
-4. Duplicate publications are removed.
-5. Results are filtered and ranked.
-6. An optional synthesis is generated from the retrieved sources.
-7. Results are displayed or exported.
+1. The user submits a search query through the CLI.
+2. The CLI validates option combinations.
+3. The OpenAlex provider retrieves publication metadata.
+4. Provider-specific responses are converted into domain models.
+5. The search service removes duplicate publications.
+6. The search service ranks the remaining publications.
+7. The CLI displays the processed results in a table.
+
+Future phases will optionally synthesize and export the processed results.
+
+## Search service
+
+The `SearchService` depends on a provider interface rather than directly on OpenAlex.
+
+This allows future providers to be introduced without changing the ranking and deduplication algorithms.
+
+### Deduplication
+
+Publications are considered duplicates when:
+
+1. Both provide the same normalized DOI.
+2. At least one DOI is unavailable and the normalized title and publication year match.
+
+When duplicates are detected, the publication with the most complete metadata is retained.
+
+Metadata completeness considers:
+
+- DOI availability.
+- Abstract availability.
+- Journal availability.
+- URL availability.
+- Publication-year availability.
+- Author availability.
+- Citation count.
+- Abstract length.
+- Number of authors.
+
+### Ranking
+
+Ranking is deterministic and uses these criteria in order:
+
+1. Exact normalized title match.
+2. Query phrase contained in the title.
+3. Query-token overlap.
+4. Citation count.
+5. Publication year.
+
+Python's stable sorting preserves provider order when all ranking criteria are equal.
+
+Ranking currently applies only to publications returned on the selected page.
 
 ## Dependency rules
 
-- The CLI coordinates user interaction but does not perform HTTP requests directly.
+- The CLI handles user interaction but does not perform HTTP requests.
+- The search service coordinates application logic.
 - Domain models do not depend on external APIs.
-- Provider implementations are accessed through interfaces.
+- Provider implementations depend on domain models.
+- The search service depends on a provider protocol rather than OpenAlex.
 - Network calls are replaced with test doubles during automated testing.
 - API keys and credentials are loaded from environment variables.
+- Ranking must remain transparent and independently testable.
+- Future language-model components must not create publication metadata.
 
 ## Development phases
 
-1. Project foundation and CLI.
-2. Publication model.
-3. Academic provider integration.
-4. Filtering, pagination, and ranking.
-5. Citation-preserving synthesis.
-6. Export system.
-7. REST API and web interface.
+- [x] Project foundation and CLI.
+- [x] Publication model.
+- [x] Academic provider integration.
+- [x] Filtering and pagination.
+- [x] Ranking and deduplication.
+- [ ] Citation-preserving synthesis.
+- [ ] Export system.
+- [ ] REST API and web interface.

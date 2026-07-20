@@ -12,6 +12,7 @@ from rich.table import Table
 from scholargraph import __version__
 from scholargraph.domain import Publication
 from scholargraph.providers import OpenAlexProvider, OpenAlexProviderError
+from scholargraph.services import SearchService
 
 app = typer.Typer(
     name="scholargraph",
@@ -92,7 +93,9 @@ def search(
         )
 
         with OpenAlexProvider(api_key=api_key) as provider:
-            publications = provider.search(
+            service = SearchService(provider)
+
+            publications = service.search(
                 query,
                 limit=limit,
                 page=page,
@@ -144,6 +147,7 @@ def _print_publications(
     table.add_column("#", justify="right", style="cyan", no_wrap=True)
     table.add_column("Title", style="bold")
     table.add_column("Year", justify="center", no_wrap=True)
+    table.add_column("Citations", justify="right", no_wrap=True)
     table.add_column("Authors")
     table.add_column("Journal")
     table.add_column("DOI / URL")
@@ -159,6 +163,7 @@ def _print_publications(
             str(position),
             publication.title,
             str(publication.publication_year or "—"),
+            str(publication.cited_by_count),
             authors or "Unknown",
             publication.journal or "—",
             identifier or "—",

@@ -24,6 +24,7 @@ def test_publication_normalizes_metadata() -> None:
             "journal": "Journal of Examples",
             "doi": "https://doi.org/10.1000/EXAMPLE",
             "url": "https://example.org/publication",
+            "cited_by_count": 42,
         }
     )
 
@@ -31,6 +32,29 @@ def test_publication_normalizes_metadata() -> None:
     assert publication.authors[0].name == "Ada Lovelace"
     assert publication.doi == "10.1000/example"
     assert publication.publication_year == 2026
+    assert publication.cited_by_count == 42
+
+
+def test_publication_defaults_citation_count_to_zero() -> None:
+    """A publication without citation metadata should remain valid."""
+    publication = Publication(
+        source="openalex",
+        source_id="W123456",
+        title="A Scientific Publication",
+    )
+
+    assert publication.cited_by_count == 0
+
+
+def test_publication_rejects_negative_citation_count() -> None:
+    """Citation counts cannot be negative."""
+    with pytest.raises(ValidationError):
+        Publication(
+            source="openalex",
+            source_id="W123456",
+            title="A Scientific Publication",
+            cited_by_count=-1,
+        )
 
 
 def test_publication_rejects_blank_title() -> None:

@@ -1,8 +1,8 @@
 # ScholarGraph
 
-ScholarGraph is a command-line academic search engine designed to retrieve, normalize, organize, and eventually summarize scientific literature with verifiable citations.
+ScholarGraph is a command-line academic search engine designed to retrieve, normalize, deduplicate, rank, and eventually summarize scientific literature with verifiable citations.
 
-> **Project status:** Early development — version 0.1.0 provides validated publication models and an OpenAlex-powered academic search command with filtering and pagination.
+> **Project status:** Early development — version 0.1.0 provides an OpenAlex-powered academic search command with filtering, pagination, deterministic ranking, and deduplication.
 
 ## Goals
 
@@ -10,7 +10,8 @@ ScholarGraph aims to:
 
 - Search academic publications from external data providers.
 - Normalize publication metadata into a consistent format.
-- Filter and rank relevant results.
+- Remove duplicate search results.
+- Rank publications using transparent criteria.
 - Generate source-grounded summaries.
 - Preserve traceable citations.
 - Export results to formats such as Markdown, JSON, and BibTeX.
@@ -26,9 +27,14 @@ ScholarGraph aims to:
 - Inclusive publication-year filters.
 - Validated and immutable publication and author domain models.
 - DOI normalization and validation.
+- Citation-count validation.
 - OpenAlex keyword-search provider.
 - OpenAlex response normalization into internal publication models.
 - OpenAlex abstract reconstruction.
+- DOI-based publication deduplication.
+- Title-and-year deduplication when DOI metadata is unavailable.
+- Deterministic publication ranking.
+- Citation counts displayed in search results.
 - Provider-specific HTTP and response validation errors.
 - Automated tests without real network requests.
 - Static type checking with mypy.
@@ -140,6 +146,27 @@ with OpenAlexProvider(
 
 Secrets and real API keys must never be committed to the repository.
 
+## Ranking and deduplication
+
+Search results are processed by a provider-independent application service.
+
+Duplicate publications are identified using:
+
+1. A normalized DOI when both publications provide one.
+2. A normalized title and publication year when DOI metadata is unavailable.
+
+When duplicates are detected, ScholarGraph retains the publication containing the most complete metadata.
+
+Publications are ranked using the following deterministic criteria:
+
+1. Exact normalized title match.
+2. Query phrase contained in the title.
+3. Proportion of query words present in the title.
+4. Citation count.
+5. Publication year.
+
+Ranking and deduplication are currently applied within each retrieved results page. No language model is used for ranking.
+
 ## Quality checks
 
 Run the automated tests:
@@ -195,12 +222,16 @@ scholargraph/
 │       ├── providers/
 │       │   ├── __init__.py
 │       │   └── openalex.py
+│       ├── services/
+│       │   ├── __init__.py
+│       │   └── search.py
 │       ├── __init__.py
 │       └── cli.py
 ├── tests/
 │   ├── test_cli.py
 │   ├── test_openalex.py
-│   └── test_publication.py
+│   ├── test_publication.py
+│   └── test_search_service.py
 ├── .env.example
 ├── .gitattributes
 ├── .gitignore
@@ -216,7 +247,7 @@ scholargraph/
 - [x] Integrate the first academic data provider.
 - [x] Expose academic search through the CLI.
 - [x] Add search filters and pagination.
-- [ ] Add result ranking and deduplication.
+- [x] Add result ranking and deduplication.
 - [ ] Add citation-preserving summaries.
 - [ ] Add Markdown, JSON, and BibTeX exports.
 - [ ] Add an API and web interface.
@@ -225,6 +256,7 @@ scholargraph/
 
 - Citations must always be traceable to retrieved sources.
 - The language model must never act as the source of publication metadata.
+- Ranking criteria must remain deterministic and explainable.
 - External services must remain replaceable.
 - Core functionality must be testable without real network requests.
 - Domain models must remain independent from provider-specific responses.
