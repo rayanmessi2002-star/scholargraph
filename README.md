@@ -2,7 +2,7 @@
 
 ScholarGraph is a command-line academic search engine designed to retrieve, normalize, deduplicate, rank, and eventually summarize scientific literature with verifiable citations.
 
-> **Project status:** Early development — version 0.1.0 provides an OpenAlex-powered academic search command with filtering, pagination, deterministic ranking, and deduplication.
+> **Project status:** Early development — version 0.1.0 provides an OpenAlex-powered academic search command with filtering, pagination, deterministic ranking, deduplication, and portable exports.
 
 ## Goals
 
@@ -14,7 +14,7 @@ ScholarGraph aims to:
 - Rank publications using transparent criteria.
 - Generate source-grounded summaries.
 - Preserve traceable citations.
-- Export results to formats such as Markdown, JSON, and BibTeX.
+- Export results to JSON, CSV, Markdown, and BibTeX.
 
 ## Current functionality
 
@@ -35,6 +35,11 @@ ScholarGraph aims to:
 - Title-and-year deduplication when DOI metadata is unavailable.
 - Deterministic publication ranking.
 - Citation counts displayed in search results.
+- JSON exports with nested author metadata.
+- CSV exports with stable columns for spreadsheet and data-processing tools.
+- Markdown table exports for reports and documentation.
+- BibTeX exports with deterministic, collision-safe citation keys.
+- UTF-8 file output that preserves international author names.
 - Provider-specific HTTP and response validation errors.
 - Automated tests without real network requests.
 - Static type checking with mypy.
@@ -104,6 +109,23 @@ Combine pagination, limits, and publication-year filters:
 ```cmd
 scholargraph search "machine learning" --limit 3 --page 2 --from-year 2020 --to-year 2024
 ```
+
+Print results as structured JSON:
+
+```cmd
+scholargraph search "graph databases" --limit 3 --format json
+```
+
+Export results to JSON, CSV, Markdown, or BibTeX files:
+
+```cmd
+scholargraph search "graph databases" --limit 10 --format json --output results.json
+scholargraph search "graph databases" --limit 10 --format csv --output results.csv
+scholargraph search "graph databases" --limit 10 --format markdown --output results.md
+scholargraph search "graph databases" --limit 10 --format bibtex --output references.bib
+```
+
+The table remains the default output format. The `--output` option requires one of the portable formats selected with `--format`.
 
 Basic page-based navigation is limited to the first 10,000 matching OpenAlex results.
 
@@ -219,6 +241,9 @@ scholargraph/
 │       ├── domain/
 │       │   ├── __init__.py
 │       │   └── publication.py
+│       ├── exporters/
+│       │   ├── __init__.py
+│       │   └── publication.py
 │       ├── providers/
 │       │   ├── __init__.py
 │       │   └── openalex.py
@@ -229,6 +254,8 @@ scholargraph/
 │       └── cli.py
 ├── tests/
 │   ├── test_cli.py
+│   ├── test_export_cli.py
+│   ├── test_exporters.py
 │   ├── test_openalex.py
 │   ├── test_publication.py
 │   └── test_search_service.py
@@ -249,7 +276,7 @@ scholargraph/
 - [x] Add search filters and pagination.
 - [x] Add result ranking and deduplication.
 - [ ] Add citation-preserving summaries.
-- [ ] Add Markdown, JSON, and BibTeX exports.
+- [x] Add JSON, CSV, Markdown, and BibTeX exports.
 - [ ] Add an API and web interface.
 
 ## Design principles

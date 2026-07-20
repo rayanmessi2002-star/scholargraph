@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -11,6 +12,7 @@ from rich.table import Table
 
 from scholargraph import __version__
 from scholargraph.domain import Publication
+from scholargraph.exporters import ExportFormat, render_publications, write_publications
 from scholargraph.providers import OpenAlexProvider, OpenAlexProviderError
 from scholargraph.services import SearchService
 
@@ -80,6 +82,25 @@ def search(
             help="Include publications up to this year.",
         ),
     ] = None,
+    output_format: Annotated[
+        ExportFormat,
+        typer.Option(
+            "--format",
+            "-f",
+            case_sensitive=False,
+            help="Output format: table, json, csv, markdown, or bibtex.",
+        ),
+    ] = ExportFormat.TABLE,
+    output: Annotated[
+        Path | None,
+        typer.Option(
+            "--output",
+            "-o",
+            dir_okay=False,
+            resolve_path=True,
+            help="Write exported results to this file.",
+        ),
+    ] = None,
 ) -> None:
     """Search OpenAlex for academic publications."""
     api_key = os.getenv("OPENALEX_API_KEY")
@@ -90,6 +111,8 @@ def search(
             page=page,
             from_year=from_year,
             to_year=to_year,
+            output_format=output_format,
+            output=output,
         )
 
         with OpenAlexProvider(api_key=api_key) as provider:
@@ -110,11 +133,23 @@ def search(
         console.print(f"[yellow]No publications found on page {page}.[/yellow]")
         return
 
-    _print_publications(
-        publications,
-        query=query,
-        page=page,
-    )
+    if output_format is ExportFormat.TABLE:
+        _print_publications(
+            publications,
+            query=query,
+            page=page,
+        )
+        return
+
+    try:
+        _export_publications(
+            publications,
+            output_format=output_format,
+            output=output,
+        )
+    except OSError as error:
+        error_console.print(f"[bold red]Export failed:[/bold red] {error}")
+        raise typer.Exit(code=1) from error
 
 
 def _validate_search_options(
@@ -123,6 +158,8 @@ def _validate_search_options(
     page: int,
     from_year: int | None,
     to_year: int | None,
+    output_format: ExportFormat,
+    output: Path | None,
 ) -> None:
     """Validate option combinations that depend on each other."""
     if page * limit > 10_000:
@@ -130,6 +167,38 @@ def _validate_search_options(
 
     if from_year is not None and to_year is not None and from_year > to_year:
         raise ValueError("From year must not be greater than to year")
+
+    if output is not None and output_format is ExportFormat.TABLE:
+        raise ValueError("--output requires --format json, csv, markdown, or bibtex")
+
+
+def _export_publications(
+    publications: list[Publication],
+    *,
+    output_format: ExportFormat,
+    output: Path | None,
+) -> None:
+    """Print an export to standard output or save it to a file."""
+    if output is None:
+        content = render_publications(
+            publications,
+            output_format=output_format,
+        )
+        typer.echo(content, nl=False)
+        return
+
+    write_publications(
+        publications,
+        output_format=output_format,
+        destination=output,
+    )
+
+    result_count = len(publications)
+    result_label = "publication" if result_count == 1 else "publications"
+    console.print(
+        f"[green]Exported {result_count} {result_label} "
+        f"as {output_format.value} to {output}.[/green]"
+    )
 
 
 def _print_publications(
