@@ -28,6 +28,9 @@ ScholarGraph aims to:
 - Validated and immutable publication and author domain models.
 - DOI normalization and validation.
 - Citation-count validation.
+- Immutable citation, summary-claim, and citation-summary domain models.
+- Validation that every summary claim references known publications.
+- Deterministic, contiguous citation labels such as `S1` and `S2`.
 - OpenAlex keyword-search provider.
 - OpenAlex response normalization into internal publication models.
 - OpenAlex abstract reconstruction.
@@ -240,7 +243,8 @@ scholargraph/
 │   └── scholargraph/
 │       ├── domain/
 │       │   ├── __init__.py
-│       │   └── publication.py
+│       │   ├── publication.py
+│       │   └── synthesis.py
 │       ├── exporters/
 │       │   ├── __init__.py
 │       │   └── publication.py
@@ -258,7 +262,8 @@ scholargraph/
 │   ├── test_exporters.py
 │   ├── test_openalex.py
 │   ├── test_publication.py
-│   └── test_search_service.py
+│   ├── test_search_service.py
+│   └── test_synthesis.py
 ├── .env.example
 ├── .gitattributes
 ├── .gitignore
@@ -275,6 +280,7 @@ scholargraph/
 - [x] Expose academic search through the CLI.
 - [x] Add search filters and pagination.
 - [x] Add result ranking and deduplication.
+- [x] Define citation-preserving summary models.
 - [ ] Add citation-preserving summaries.
 - [x] Add JSON, CSV, Markdown, and BibTeX exports.
 - [ ] Add an API and web interface.
