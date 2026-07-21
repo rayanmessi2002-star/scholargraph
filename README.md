@@ -2,7 +2,7 @@
 
 ScholarGraph is a command-line academic search engine designed to retrieve, normalize, deduplicate, rank, and eventually summarize scientific literature with verifiable citations.
 
-> **Project status:** Early development — version 0.1.0 provides an OpenAlex-powered academic search command with filtering, pagination, deterministic ranking, deduplication, and portable exports.
+> **Project status:** Early development — version 0.1.0 provides an OpenAlex-powered academic search command with filtering, pagination, deterministic ranking, deduplication, portable exports, and an internal extractive synthesis service.
 
 ## Goals
 
@@ -31,6 +31,11 @@ ScholarGraph aims to:
 - Immutable citation, summary-claim, and citation-summary domain models.
 - Validation that every summary claim references known publications.
 - Deterministic, contiguous citation labels such as `S1` and `S2`.
+- Provider-independent synthesizer interface.
+- Deterministic extractive synthesis from retrieved abstracts.
+- Query-aware selection of verbatim evidence sentences.
+- Rejection of synthesis when abstracts or relevant evidence are unavailable.
+- Configurable source limits between one and ten publications.
 - OpenAlex keyword-search provider.
 - OpenAlex response normalization into internal publication models.
 - OpenAlex abstract reconstruction.
@@ -253,7 +258,8 @@ scholargraph/
 │       │   └── openalex.py
 │       ├── services/
 │       │   ├── __init__.py
-│       │   └── search.py
+│       │   ├── search.py
+│       │   └── synthesis.py
 │       ├── __init__.py
 │       └── cli.py
 ├── tests/
@@ -263,7 +269,8 @@ scholargraph/
 │   ├── test_openalex.py
 │   ├── test_publication.py
 │   ├── test_search_service.py
-│   └── test_synthesis.py
+│   ├── test_synthesis.py
+│   └── test_synthesis_service.py
 ├── .env.example
 ├── .gitattributes
 ├── .gitignore
@@ -281,7 +288,8 @@ scholargraph/
 - [x] Add search filters and pagination.
 - [x] Add result ranking and deduplication.
 - [x] Define citation-preserving summary models.
-- [ ] Add citation-preserving summaries.
+- [x] Add deterministic citation-preserving synthesis.
+- [ ] Expose citation-preserving summaries through the CLI.
 - [x] Add JSON, CSV, Markdown, and BibTeX exports.
 - [ ] Add an API and web interface.
 
