@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
 
@@ -14,7 +15,20 @@ from scholargraph import __version__
 from scholargraph.domain import CitationSummary, Publication
 from scholargraph.exporters import ExportFormat, render_publications, write_publications
 from scholargraph.providers import OpenAlexProvider, OpenAlexProviderError
+from scholargraph.providers.openai_synthesis import (
+    OpenAIModelClient,
+    OpenAIResponsesTransport,
+)
 from scholargraph.services import ExtractiveSynthesizer, SearchService, SynthesisError
+from scholargraph.services.model_synthesis import ModelAssistedSynthesizer
+
+
+class SummaryGenerator(StrEnum):
+    """Available summary-generation strategies."""
+
+    EXTRACTIVE = "extractive"
+    MODEL = "model"
+
 
 app = typer.Typer(
     name="scholargraph",
@@ -206,11 +220,25 @@ def summarize(
             help="Include publications up to this year.",
         ),
     ] = None,
+    generator: Annotated[
+        SummaryGenerator,
+        typer.Option(
+            "--generator",
+            case_sensitive=False,
+            help="Summary generator: extractive or model.",
+        ),
+    ] = SummaryGenerator.EXTRACTIVE,
 ) -> None:
     """Create a citation-preserving summary from OpenAlex abstracts."""
-    api_key = os.getenv("OPENALEX_API_KEY")
+    openalex_api_key = os.getenv("OPENALEX_API_KEY")
+    openai_api_key: str | None = None
+    openai_model: str | None = None
 
     try:
+        if generator is SummaryGenerator.MODEL:
+            openai_api_key = _required_environment_variable("OPENAI_API_KEY")
+            openai_model = _required_environment_variable("OPENAI_MODEL")
+
         _validate_result_window(
             limit=limit,
             page=page,
@@ -218,7 +246,7 @@ def summarize(
             to_year=to_year,
         )
 
-        with OpenAlexProvider(api_key=api_key) as provider:
+        with OpenAlexProvider(api_key=openalex_api_key) as provider:
             search_service = SearchService(provider)
             publications = search_service.search(
                 query,
@@ -232,16 +260,50 @@ def summarize(
             console.print(f"[yellow]No publications found on page {page}.[/yellow]")
             return
 
-        summary = ExtractiveSynthesizer().synthesize(
-            query,
-            publications,
-            max_sources=max_sources,
-        )
-    except (OpenAlexProviderError, SynthesisError, ValueError) as error:
+        if generator is SummaryGenerator.MODEL:
+            assert openai_api_key is not None
+            assert openai_model is not None
+
+            transport = OpenAIResponsesTransport.from_api_key(
+                api_key=openai_api_key,
+            )
+            model_client = OpenAIModelClient(
+                model=openai_model,
+                transport=transport,
+            )
+            summary = ModelAssistedSynthesizer(
+                client=model_client,
+            ).synthesize(
+                query,
+                publications,
+                max_sources=max_sources,
+            )
+        else:
+            summary = ExtractiveSynthesizer().synthesize(
+                query,
+                publications,
+                max_sources=max_sources,
+            )
+    except (
+        OpenAlexProviderError,
+        RuntimeError,
+        SynthesisError,
+        ValueError,
+    ) as error:
         error_console.print(f"[bold red]Summary failed:[/bold red] {error}")
         raise typer.Exit(code=1) from error
 
     _print_summary(summary)
+
+
+def _required_environment_variable(name: str) -> str:
+    """Return a required non-blank environment variable."""
+    value = os.getenv(name)
+
+    if not value or not value.strip():
+        raise ValueError(f"{name} is required when --generator model is used")
+
+    return value.strip()
 
 
 def _validate_search_options(
@@ -321,15 +383,31 @@ def _print_publications(
         show_lines=True,
     )
 
-    table.add_column("#", justify="right", style="cyan", no_wrap=True)
+    table.add_column(
+        "#",
+        justify="right",
+        style="cyan",
+        no_wrap=True,
+    )
     table.add_column("Title", style="bold")
-    table.add_column("Year", justify="center", no_wrap=True)
-    table.add_column("Citations", justify="right", no_wrap=True)
+    table.add_column(
+        "Year",
+        justify="center",
+        no_wrap=True,
+    )
+    table.add_column(
+        "Citations",
+        justify="right",
+        no_wrap=True,
+    )
     table.add_column("Authors")
     table.add_column("Journal")
     table.add_column("DOI / URL")
 
-    for position, publication in enumerate(publications, start=1):
+    for position, publication in enumerate(
+        publications,
+        start=1,
+    ):
         authors = ", ".join(author.name for author in publication.authors)
         identifier = publication.doi
 
@@ -361,7 +439,10 @@ def _print_summary(summary: CitationSummary) -> None:
 
     for claim in summary.claims:
         labels = " ".join(f"[{label}]" for label in claim.citations)
-        console.print(f"• {claim.text} {labels}", markup=False)
+        console.print(
+            f"• {claim.text} {labels}",
+            markup=False,
+        )
 
     console.print()
 
@@ -369,9 +450,20 @@ def _print_summary(summary: CitationSummary) -> None:
         title="Sources",
         show_lines=True,
     )
-    sources.add_column("Citation", style="cyan", no_wrap=True)
-    sources.add_column("Title", style="bold")
-    sources.add_column("Year", justify="center", no_wrap=True)
+    sources.add_column(
+        "Citation",
+        style="cyan",
+        no_wrap=True,
+    )
+    sources.add_column(
+        "Title",
+        style="bold",
+    )
+    sources.add_column(
+        "Year",
+        justify="center",
+        no_wrap=True,
+    )
     sources.add_column("DOI / URL / Source ID")
 
     for citation in summary.citations:
