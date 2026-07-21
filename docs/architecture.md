@@ -17,7 +17,7 @@ This modular design allows external APIs, ranking strategies, exporters, or lang
 | Domain models | Represent publications, authors, citations, claims, and summaries consistently | Implemented |
 | Deduplicator | Remove repeated publications safely | Implemented |
 | Ranker | Order results using transparent criteria | Implemented |
-| Synthesizer | Produce source-grounded summaries | Planned |
+| Synthesizer | Produce source-grounded summaries from normalized evidence | Implemented |
 | Exporter | Serialize results as JSON, CSV, Markdown, or BibTeX | Implemented |
 | API and web interface | Expose ScholarGraph beyond the CLI | Planned |
 
@@ -87,6 +87,21 @@ Synthesis output uses structured domain models before it reaches the CLI or an e
 
 This contract will be shared by deterministic and language-model-based synthesizers. A model may propose claims, but it cannot create or reference a source that was not retrieved and normalized first.
 
+## Extractive synthesis
+
+The `ExtractiveSynthesizer` provides a deterministic baseline that does not require a language model.
+
+1. It receives already ranked and normalized publications.
+2. It ignores publications that do not contain abstracts.
+3. It splits each abstract into sentences.
+4. It selects the sentence with the strongest transparent query-token overlap.
+5. It copies that sentence verbatim into a `SummaryClaim`.
+6. It attaches the originating publication through a contiguous citation label.
+
+Source ranking order is preserved. Identical evidence from multiple publications becomes one claim with multiple citations. The service refuses to produce a summary when no abstract contains query evidence, and source limits are constrained to a safe range from one to ten.
+
+Extractive synthesis is intentionally conservative: it does not paraphrase, combine unsupported ideas, or use a language model. A future CLI command and optional model-backed implementation will depend on the same `SummarySynthesizer` protocol and citation safety contract.
+
 ## Export system
 
 Exporters depend only on normalized publication domain models. They do not perform searches, network requests, ranking, or deduplication.
@@ -109,6 +124,7 @@ Portable formats can be printed to standard output or written as UTF-8 files. Fi
 - Summary models enforce referential integrity between claims and publications.
 - Provider implementations depend on domain models.
 - The search service depends on a provider protocol rather than OpenAlex.
+- Synthesizers depend on normalized publications rather than provider responses.
 - Exporters depend on domain models rather than provider responses.
 - The CLI selects output destinations, while exporters own serialization.
 - Network calls are replaced with test doubles during automated testing.
@@ -124,6 +140,7 @@ Portable formats can be printed to standard output or written as UTF-8 files. Fi
 - [x] Filtering and pagination.
 - [x] Ranking and deduplication.
 - [x] Citation and summary domain models.
-- [ ] Citation-preserving synthesis.
+- [x] Deterministic citation-preserving synthesis service.
+- [ ] Citation summary CLI command.
 - [x] Export system.
 - [ ] REST API and web interface.
