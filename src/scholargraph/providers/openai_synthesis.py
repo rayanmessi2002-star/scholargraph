@@ -95,7 +95,7 @@ class OpenAIResponsesTransport:
                 "OpenAI SDK is not installed; install the 'openai' package"
             ) from error
 
-        openai_factory = getattr(openai_module, "OpenAI")
+        openai_factory = openai_module.OpenAI
         client = openai_factory(api_key=normalized_api_key)
 
         return cls(client=cast(OpenAIClientProtocol, client))

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
 
@@ -23,7 +23,7 @@ from scholargraph.services import ExtractiveSynthesizer, SearchService, Synthesi
 from scholargraph.services.model_synthesis import ModelAssistedSynthesizer
 
 
-class SummaryGenerator(str, Enum):
+class SummaryGenerator(StrEnum):
     """Available summary-generation strategies."""
 
     EXTRACTIVE = "extractive"
