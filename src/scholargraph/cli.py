@@ -11,10 +11,10 @@ from rich.console import Console
 from rich.table import Table
 
 from scholargraph import __version__
-from scholargraph.domain import Publication
+from scholargraph.domain import CitationSummary, Publication
 from scholargraph.exporters import ExportFormat, render_publications, write_publications
 from scholargraph.providers import OpenAlexProvider, OpenAlexProviderError
-from scholargraph.services import SearchService
+from scholargraph.services import ExtractiveSynthesizer, SearchService, SynthesisError
 
 app = typer.Typer(
     name="scholargraph",
@@ -152,6 +152,98 @@ def search(
         raise typer.Exit(code=1) from error
 
 
+@app.command()
+def summarize(
+    query: Annotated[
+        str,
+        typer.Argument(help="Academic topic or keywords to summarize."),
+    ],
+    limit: Annotated[
+        int,
+        typer.Option(
+            "--limit",
+            "-n",
+            min=1,
+            max=100,
+            help="Number of publications to retrieve as evidence.",
+        ),
+    ] = 10,
+    max_sources: Annotated[
+        int,
+        typer.Option(
+            "--max-sources",
+            "-s",
+            min=1,
+            max=10,
+            help="Maximum number of publications cited by the summary.",
+        ),
+    ] = 3,
+    page: Annotated[
+        int,
+        typer.Option(
+            "--page",
+            "-p",
+            min=1,
+            max=500,
+            help="Results page to use as evidence.",
+        ),
+    ] = 1,
+    from_year: Annotated[
+        int | None,
+        typer.Option(
+            "--from-year",
+            min=1000,
+            max=2100,
+            help="Include publications from this year onwards.",
+        ),
+    ] = None,
+    to_year: Annotated[
+        int | None,
+        typer.Option(
+            "--to-year",
+            min=1000,
+            max=2100,
+            help="Include publications up to this year.",
+        ),
+    ] = None,
+) -> None:
+    """Create a citation-preserving summary from OpenAlex abstracts."""
+    api_key = os.getenv("OPENALEX_API_KEY")
+
+    try:
+        _validate_result_window(
+            limit=limit,
+            page=page,
+            from_year=from_year,
+            to_year=to_year,
+        )
+
+        with OpenAlexProvider(api_key=api_key) as provider:
+            search_service = SearchService(provider)
+            publications = search_service.search(
+                query,
+                limit=limit,
+                page=page,
+                from_year=from_year,
+                to_year=to_year,
+            )
+
+        if not publications:
+            console.print(f"[yellow]No publications found on page {page}.[/yellow]")
+            return
+
+        summary = ExtractiveSynthesizer().synthesize(
+            query,
+            publications,
+            max_sources=max_sources,
+        )
+    except (OpenAlexProviderError, SynthesisError, ValueError) as error:
+        error_console.print(f"[bold red]Summary failed:[/bold red] {error}")
+        raise typer.Exit(code=1) from error
+
+    _print_summary(summary)
+
+
 def _validate_search_options(
     *,
     limit: int,
@@ -162,14 +254,30 @@ def _validate_search_options(
     output: Path | None,
 ) -> None:
     """Validate option combinations that depend on each other."""
+    _validate_result_window(
+        limit=limit,
+        page=page,
+        from_year=from_year,
+        to_year=to_year,
+    )
+
+    if output is not None and output_format is ExportFormat.TABLE:
+        raise ValueError("--output requires --format json, csv, markdown, or bibtex")
+
+
+def _validate_result_window(
+    *,
+    limit: int,
+    page: int,
+    from_year: int | None,
+    to_year: int | None,
+) -> None:
+    """Validate pagination and publication-year combinations."""
     if page * limit > 10_000:
         raise ValueError("Page and limit cannot request results beyond the first 10,000")
 
     if from_year is not None and to_year is not None and from_year > to_year:
         raise ValueError("From year must not be greater than to year")
-
-    if output is not None and output_format is ExportFormat.TABLE:
-        raise ValueError("--output requires --format json, csv, markdown, or bibtex")
 
 
 def _export_publications(
@@ -244,6 +352,44 @@ def _print_publications(
     result_label = "publication" if result_count == 1 else "publications"
 
     console.print(f"[dim]Page {page} · {result_count} {result_label} found.[/dim]")
+
+
+def _print_summary(summary: CitationSummary) -> None:
+    """Display a citation-preserving summary and its source list."""
+    console.print(f"[bold]Summary: {summary.query}[/bold]")
+    console.print()
+
+    for claim in summary.claims:
+        labels = " ".join(f"[{label}]" for label in claim.citations)
+        console.print(f"• {claim.text} {labels}", markup=False)
+
+    console.print()
+
+    sources = Table(
+        title="Sources",
+        show_lines=True,
+    )
+    sources.add_column("Citation", style="cyan", no_wrap=True)
+    sources.add_column("Title", style="bold")
+    sources.add_column("Year", justify="center", no_wrap=True)
+    sources.add_column("DOI / URL / Source ID")
+
+    for citation in summary.citations:
+        publication = citation.publication
+        identifier = publication.doi
+
+        if not identifier and publication.url:
+            identifier = str(publication.url)
+
+        sources.add_row(
+            f"[{citation.label}]",
+            publication.title,
+            str(publication.publication_year or "—"),
+            identifier or publication.source_id,
+        )
+
+    console.print(sources)
+    console.print(f"[dim]Generator: {summary.generator or 'unknown'}[/dim]")
 
 
 if __name__ == "__main__":

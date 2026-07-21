@@ -9,7 +9,7 @@ from typing import Protocol
 
 from scholargraph.domain import Citation, CitationSummary, Publication, SummaryClaim
 
-_SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?])\s+")
+_SENTENCE_BOUNDARY = re.compile(r"(?:(?<=[.!?])\s+|(?<=[a-z0-9][.!?])(?=[A-Z]))")
 
 
 class SynthesisError(RuntimeError):
