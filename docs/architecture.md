@@ -29,10 +29,9 @@ This modular design allows external APIs, ranking strategies, exporters, or lang
 4. Provider-specific responses are converted into domain models.
 5. The search service removes duplicate publications.
 6. The search service ranks the remaining publications.
-7. The CLI displays the processed results in a table or delegates to an exporter.
-8. An exporter prints portable output or writes a UTF-8 file.
-
-Future phases will optionally synthesize the processed results before display or export.
+7. For search, the CLI displays the processed results in a table or delegates to an exporter.
+8. For summaries, the extractive synthesizer selects claims from abstract evidence.
+9. The CLI displays inline citation labels and a traceable source table.
 
 ## Search service
 
@@ -100,7 +99,9 @@ The `ExtractiveSynthesizer` provides a deterministic baseline that does not requ
 
 Source ranking order is preserved. Identical evidence from multiple publications becomes one claim with multiple citations. The service refuses to produce a summary when no abstract contains query evidence, and source limits are constrained to a safe range from one to ten.
 
-Extractive synthesis is intentionally conservative: it does not paraphrase, combine unsupported ideas, or use a language model. A future CLI command and optional model-backed implementation will depend on the same `SummarySynthesizer` protocol and citation safety contract.
+The sentence splitter also handles missing whitespace after sentence punctuation found in some upstream abstracts without altering the extracted evidence text.
+
+Extractive synthesis is intentionally conservative: it does not paraphrase, combine unsupported ideas, or use a language model. The public `summarize` command orchestrates search, ranking, synthesis, and citation rendering. An optional future model-backed implementation will depend on the same `SummarySynthesizer` protocol and citation safety contract.
 
 ## Export system
 
@@ -127,6 +128,7 @@ Portable formats can be printed to standard output or written as UTF-8 files. Fi
 - Synthesizers depend on normalized publications rather than provider responses.
 - Exporters depend on domain models rather than provider responses.
 - The CLI selects output destinations, while exporters own serialization.
+- The CLI renders validated summary models but does not generate claims itself.
 - Network calls are replaced with test doubles during automated testing.
 - API keys and credentials are loaded from environment variables.
 - Ranking must remain transparent and independently testable.
@@ -141,6 +143,7 @@ Portable formats can be printed to standard output or written as UTF-8 files. Fi
 - [x] Ranking and deduplication.
 - [x] Citation and summary domain models.
 - [x] Deterministic citation-preserving synthesis service.
-- [ ] Citation summary CLI command.
+- [x] Citation summary CLI command.
+- [ ] Optional model-assisted synthesis.
 - [x] Export system.
 - [ ] REST API and web interface.

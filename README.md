@@ -2,7 +2,7 @@
 
 ScholarGraph is a command-line academic search engine designed to retrieve, normalize, deduplicate, rank, and eventually summarize scientific literature with verifiable citations.
 
-> **Project status:** Early development — version 0.1.0 provides an OpenAlex-powered academic search command with filtering, pagination, deterministic ranking, deduplication, portable exports, and an internal extractive synthesis service.
+> **Project status:** Early development — version 0.1.0 provides OpenAlex-powered academic search, portable exports, and deterministic citation-preserving summaries from retrieved abstracts.
 
 ## Goals
 
@@ -22,6 +22,7 @@ ScholarGraph aims to:
 - Command-line interface built with Typer.
 - Version command.
 - Academic search command.
+- Citation-preserving summary command.
 - Configurable results per page.
 - Page-based result navigation.
 - Inclusive publication-year filters.
@@ -36,6 +37,7 @@ ScholarGraph aims to:
 - Query-aware selection of verbatim evidence sentences.
 - Rejection of synthesis when abstracts or relevant evidence are unavailable.
 - Configurable source limits between one and ten publications.
+- Summary output with inline labels and a traceable source table.
 - OpenAlex keyword-search provider.
 - OpenAlex response normalization into internal publication models.
 - OpenAlex abstract reconstruction.
@@ -134,6 +136,21 @@ scholargraph search "graph databases" --limit 10 --format bibtex --output refere
 ```
 
 The table remains the default output format. The `--output` option requires one of the portable formats selected with `--format`.
+
+Create a deterministic citation-preserving summary from retrieved abstracts:
+
+```cmd
+scholargraph summarize "graph databases"
+```
+
+Control retrieval, cited sources, pagination, and publication years:
+
+```cmd
+scholargraph summarize "graph databases" --limit 10 --max-sources 3
+scholargraph summarize "machine learning" --page 2 --from-year 2020 --to-year 2026
+```
+
+Each summary claim is copied verbatim from a retrieved abstract and ends with a source label such as `[S1]`. The source table maps every label to its publication title, year, and DOI, URL, or provider identifier.
 
 Basic page-based navigation is limited to the first 10,000 matching OpenAlex results.
 
@@ -269,6 +286,7 @@ scholargraph/
 │   ├── test_openalex.py
 │   ├── test_publication.py
 │   ├── test_search_service.py
+│   ├── test_summary_cli.py
 │   ├── test_synthesis.py
 │   └── test_synthesis_service.py
 ├── .env.example
@@ -289,7 +307,8 @@ scholargraph/
 - [x] Add result ranking and deduplication.
 - [x] Define citation-preserving summary models.
 - [x] Add deterministic citation-preserving synthesis.
-- [ ] Expose citation-preserving summaries through the CLI.
+- [x] Expose citation-preserving summaries through the CLI.
+- [ ] Add optional model-assisted synthesis behind the same citation contract.
 - [x] Add JSON, CSV, Markdown, and BibTeX exports.
 - [ ] Add an API and web interface.
 

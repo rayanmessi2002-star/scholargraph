@@ -103,6 +103,25 @@ def test_synthesizer_aggregates_identical_evidence() -> None:
     assert len(summary.citations) == 2
 
 
+def test_synthesizer_handles_missing_sentence_space() -> None:
+    """Upstream punctuation defects should not merge separate evidence sentences."""
+    publication = _publication(
+        "W1",
+        title="Graph Search",
+        abstract=(
+            "An unrelated sentence ends efficiently.In this paper, graph databases are studied."
+        ),
+    )
+
+    summary = ExtractiveSynthesizer().synthesize(
+        "graph databases",
+        [publication],
+    )
+
+    assert summary.claims[0].text == "In this paper, graph databases are studied."
+    assert summary.claims[0].text in (publication.abstract or "")
+
+
 def test_synthesizer_limits_number_of_sources() -> None:
     """The configured source cap should limit summary size."""
     publications = [
